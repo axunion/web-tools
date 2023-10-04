@@ -1,0 +1,30 @@
+{
+  "name": "web-tools",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "prepare": "husky install",
+    "format": "prettier --write \"**/*.+(html|css|js|json|yml|ts)\"",
+    "format:check": "prettier --check \"**/*.+(html|css|js|json|yml|ts)\"",
+    "lint": "eslint --ext .js,.ts src/",
+    "test": "npm run format:check && npm run lint"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.2",
+    "@typescript-eslint/eslint-plugin": "^6.7.4",
+    "@typescript-eslint/parser": "^6.7.4",
+    "eslint": "^8.50.0",
+    "prettier": "3.0.3",
+    "typescript": "^5.0.2",
+    "vite": "^4.3.2",
+    "husky": "^8.0.0"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.3",
+    "tesseract.js": "^4.0.6"
+  }
+}

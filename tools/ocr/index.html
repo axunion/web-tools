@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OCR</title>
+  </head>
+  <body>
+    <h1>OCR</h1>
+
+    <section>
+      <input type="file" id="imageUpload" accept="image/*" />
+    </section>
+
+    <section>
+      <button id="startOcr">Start OCR</button>
+    </section>
+
+    <section>
+      <textarea id="ocrResult" readonly></textarea>
+    </section>
+
+    <div id="loadingIndicator">
+      <div>Processing...</div>
+    </div>
+
+    <script type="module" src="ocr.ts"></script>
+  </body>
+</html>
