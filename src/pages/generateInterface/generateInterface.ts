@@ -10,7 +10,7 @@ const interfaceExists = (interfaceDefinition: string): boolean => {
 
 export const generateInterfaces = (
   obj: object,
-  name = 'RootObject',
+  name = "RootObject",
 ): string => {
   const generateInterface = (obj: object, name: string): string | null => {
     let result = `interface ${name} {\n`;
@@ -25,11 +25,11 @@ export const generateInterfaces = (
         continue;
       }
 
-      if (type === 'object') {
+      if (type === "object") {
         if (Array.isArray(value)) {
-          const elementType = value.length > 0 ? typeof value[0] : 'any';
+          const elementType = value.length > 0 ? typeof value[0] : "any";
 
-          if (elementType === 'object') {
+          if (elementType === "object") {
             const subInterfaceName = `${capitalizeFirstLetter(key)}Element`;
             const subInterface = generateInterface(value[0], subInterfaceName);
 
@@ -67,5 +67,5 @@ export const generateInterfaces = (
     interfaces.push(rootInterface);
   }
 
-  return interfaces.join('\n');
+  return interfaces.join("\n");
 };

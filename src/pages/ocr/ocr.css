@@ -20,7 +20,7 @@ section {
   text-align: center;
 }
 
-input[type='file'] {
+input[type="file"] {
   margin: 20px auto;
   display: block;
 }

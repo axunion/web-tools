@@ -1,11 +1,10 @@
-const DB_NAME = 'db';
-const STORE_NAME = 'store';
-const VERSION = 1;
+const DEFAULT_DB_NAME = "db";
+const DEFAULT_STORE_NAME = "store";
 
 class IndexedDBError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'IndexedDBError';
+    this.name = "IndexedDBError";
   }
 }
 
@@ -14,14 +13,17 @@ export class IndexedDB<T> {
   #storeName: string;
   #dbConnection: IDBDatabase | null = null;
 
-  constructor(dbName: string = DB_NAME, storeName: string = STORE_NAME) {
+  constructor(
+    dbName: string = DEFAULT_DB_NAME,
+    storeName: string = DEFAULT_STORE_NAME,
+  ) {
     this.#dbName = dbName;
     this.#storeName = storeName;
   }
 
   async init(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const openRequest = indexedDB.open(this.#dbName, VERSION);
+      const openRequest = indexedDB.open(this.#dbName);
 
       openRequest.onupgradeneeded = (e: IDBVersionChangeEvent) => {
         const db = (e.target as IDBOpenDBRequest).result;
@@ -61,7 +63,7 @@ export class IndexedDB<T> {
 
   async set(key: string, value: T): Promise<void> {
     const db = this.#getDB();
-    const transaction = db.transaction(this.#storeName, 'readwrite');
+    const transaction = db.transaction(this.#storeName, "readwrite");
     const store = transaction.objectStore(this.#storeName);
     store.put(value, key);
 
@@ -74,7 +76,7 @@ export class IndexedDB<T> {
 
   async get(key: string): Promise<T> {
     const db = this.#getDB();
-    const transaction = db.transaction(this.#storeName, 'readonly');
+    const transaction = db.transaction(this.#storeName, "readonly");
     const store = transaction.objectStore(this.#storeName);
     const request = store.get(key);
 
@@ -87,7 +89,7 @@ export class IndexedDB<T> {
 
   async delete(key: string): Promise<void> {
     const db = this.#getDB();
-    const transaction = db.transaction(this.#storeName, 'readwrite');
+    const transaction = db.transaction(this.#storeName, "readwrite");
     const store = transaction.objectStore(this.#storeName);
     store.delete(key);
 
