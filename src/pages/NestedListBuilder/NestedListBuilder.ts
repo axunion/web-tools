@@ -1,46 +1,53 @@
-export type PrimitiveType = string | number | null | undefined;
-export interface RecursiveType {
-  [key: string]: PrimitiveType | RecursiveType | RecursiveType[];
-}
-export type RecursiveOrArray = RecursiveType | RecursiveType[];
+type KeyType = string | number | symbol;
 
 export class NestedListBuilder {
-  #dataMap: WeakMap<HTMLElement, RecursiveOrArray>;
+  #dataMap: WeakMap<HTMLElement, unknown>;
+  #targetKeys: string[] = [];
 
-  constructor() {
+  constructor(targetKeys: string[] = []) {
     this.#dataMap = new WeakMap();
+    this.#targetKeys = targetKeys;
   }
 
-  get dataMap(): WeakMap<HTMLElement, RecursiveOrArray> {
+  get dataMap(): WeakMap<HTMLElement, unknown> {
     return this.#dataMap;
   }
 
-  getData(element: HTMLElement): RecursiveOrArray | undefined {
+  getData(element: HTMLElement): unknown | undefined {
     return this.#dataMap.get(element);
   }
 
-  build(nodeData: RecursiveOrArray): HTMLElement {
+  build(nodeData: unknown): HTMLUListElement {
     const ul = document.createElement("ul");
+    const df = document.createDocumentFragment();
 
     if (Array.isArray(nodeData)) {
       nodeData.forEach((item, index) => {
         const name = item.name ? item.name : index;
-        this.#createListItem(ul, `${name}`, item);
+        df.appendChild(this.#createListItem(String(name), item));
       });
-    } else {
-      for (const [key, item] of Object.entries(nodeData)) {
-        this.#createListItem(ul, key, item);
+    } else if (nodeData !== null && typeof nodeData === "object") {
+      const nodeDataObj = nodeData as Record<string, unknown>;
+
+      if (this.#targetKeys.length > 0) {
+        for (const key of this.#targetKeys) {
+          if (key in nodeDataObj) {
+            df.appendChild(this.#createListItem(key, nodeDataObj[key]));
+          }
+        }
+      } else {
+        for (const key in nodeDataObj) {
+          df.appendChild(this.#createListItem(key, nodeDataObj[key]));
+        }
       }
     }
+
+    ul.appendChild(df);
 
     return ul;
   }
 
-  #createListItem(
-    ul: HTMLElement,
-    key: string,
-    item: RecursiveOrArray | PrimitiveType,
-  ): void {
+  #createListItem(key: string, item: unknown): HTMLLIElement {
     const li = document.createElement("li");
     const keySpan = document.createElement("span");
 
@@ -50,26 +57,31 @@ export class NestedListBuilder {
 
     if (item !== null && typeof item === "object") {
       this.#dataMap.set(keySpan, item);
+      li.setAttribute("data-key", "parent");
       li.appendChild(this.build(item));
-      li.setAttribute("data-class", "parent");
     } else {
       const valueSpan = document.createElement("span");
-      valueSpan.textContent = `${item}`;
+      valueSpan.textContent = String(item);
       li.appendChild(valueSpan);
     }
 
-    ul.appendChild(li);
+    return li;
   }
 
-  filterObject(obj: RecursiveType, keys: string[]): RecursiveType {
-    const result: RecursiveType = {};
+  filterObject(obj: Record<KeyType, unknown>, keys: KeyType[]): unknown {
+    const result: Record<KeyType, unknown> = {};
 
-    for (const [key, value] of Object.entries(obj)) {
+    for (const key in obj) {
+      const value = obj[key];
+
       if (keys.includes(key)) {
         if (Array.isArray(value)) {
-          result[key] = this.filterArray(value, keys);
+          result[key] = this.filterArray(value as [], keys);
         } else if (value !== null && typeof value === "object") {
-          result[key] = this.filterObject(value, keys);
+          result[key] = this.filterObject(
+            value as Record<string, unknown>,
+            keys,
+          );
         } else {
           result[key] = value;
         }
@@ -79,8 +91,8 @@ export class NestedListBuilder {
     return result;
   }
 
-  filterArray(arr: RecursiveType[], keys: string[]): RecursiveType[] {
-    const result: RecursiveType[] = [];
+  filterArray(arr: [], keys: KeyType[]): unknown[] {
+    const result = [];
 
     for (const value of arr) {
       const data = this.filterObject(value, keys);
