@@ -1,5 +1,13 @@
-const DEFAULT_DB_NAME = "db";
-const DEFAULT_STORE_NAME = "store";
+type DBDefinition = {
+  name: string;
+  version: number;
+  stores: StoreDefinition[];
+};
+
+type StoreDefinition = {
+  name: string;
+  options?: IDBObjectStoreParameters;
+};
 
 export class IndexedDBError extends Error {
   constructor(message: string) {
@@ -8,111 +16,136 @@ export class IndexedDBError extends Error {
   }
 }
 
-export class IndexedDB<T> {
-  #dbName: string;
-  #storeName: string;
-  #options?: IDBObjectStoreParameters;
-  #dbConnection: IDBDatabase | null = null;
+export class IndexedDBService {
+  #db: IDBDatabase | null = null;
+  #name: string;
+  #version: number;
+  #stores: StoreDefinition[];
+  #storeName = "";
 
-  constructor(
-    dbName: string = DEFAULT_DB_NAME,
-    storeName: string = DEFAULT_STORE_NAME,
-    options?: IDBObjectStoreParameters,
-  ) {
-    this.#dbName = dbName;
-    this.#storeName = storeName;
-    this.#options = options;
+  constructor({ name, version, stores }: DBDefinition) {
+    this.#name = name;
+    this.#version = version;
+    this.#stores = stores;
   }
 
-  async init(): Promise<void> {
-    if (this.#dbConnection) {
+  async open(): Promise<void> {
+    if (this.#db) {
       return;
     }
 
     return new Promise((resolve, reject) => {
-      const openRequest = indexedDB.open(this.#dbName);
+      const request = indexedDB.open(this.#name, this.#version);
 
-      openRequest.onupgradeneeded = (e: IDBVersionChangeEvent) => {
+      request.onupgradeneeded = (e: IDBVersionChangeEvent) => {
         const db = (e.target as IDBOpenDBRequest).result;
 
-        if (!db.objectStoreNames.contains(this.#storeName)) {
-          db.createObjectStore(this.#storeName, this.#options);
-        }
+        this.#stores.forEach(({ name, options }) => {
+          if (!db.objectStoreNames.contains(name)) {
+            db.createObjectStore(name, options);
+          }
+        });
       };
 
-      openRequest.onsuccess = () => {
-        this.#dbConnection = openRequest.result;
+      request.onsuccess = (e: Event) => {
+        this.#db = (e.target as IDBOpenDBRequest).result;
         resolve();
       };
 
-      openRequest.onerror = () => {
-        reject(new IndexedDBError(`Error opening database ${this.#dbName}`));
+      request.onerror = () => {
+        const message = `Error opening database ${this.#name}`;
+        reject(new IndexedDBError(message));
       };
 
-      openRequest.onblocked = () => {
-        const message =
-          `Database ${this.#dbName} is blocked.` +
-          `Close other tabs or windows accessing this database.`;
+      request.onblocked = () => {
+        const message = `Database ${
+          this.#name
+        } is blocked.Close other tabs or windows accessing this database.`;
         reject(new IndexedDBError(message));
       };
     });
   }
 
-  #getDB(): IDBDatabase {
-    if (!this.#dbConnection) {
-      const message =
-        `Database ${this.#dbName} is not initialized.` +
-        `Please ensure you've called init() before any operations.`;
+  #getDatabase(): IDBDatabase {
+    if (!this.#db) {
+      const message = `Database ${
+        this.#name
+      } is not initialized.Please open the database before using it.`;
       throw new IndexedDBError(message);
     }
 
-    return this.#dbConnection;
+    return this.#db;
   }
 
-  async put(
-    value: T,
-    key?: IDBValidKey | undefined,
-  ): Promise<IDBValidKey | undefined> {
-    const db = this.#getDB();
-    const transaction = db.transaction(this.#storeName, "readwrite");
+  #getConnection(mode: IDBTransactionMode): {
+    transaction: IDBTransaction;
+    store: IDBObjectStore;
+  } {
+    if (!this.#storeName) {
+      const message = `Store is not set. Please use useStore() before using the store.`;
+      throw new IndexedDBError(message);
+    }
+
+    const db = this.#getDatabase();
+    const transaction = db.transaction(this.#storeName, mode);
     const store = transaction.objectStore(this.#storeName);
+
+    transaction.onerror = () => {
+      const message = `Transaction error in store '${
+        this.#storeName
+      }': ${transaction.error?.message}`;
+      throw new IndexedDBError(message);
+    };
+
+    return { transaction, store };
+  }
+
+  useStore(name: string): IndexedDBService {
+    const db = this.#getDatabase();
+
+    if (!db.objectStoreNames.contains(name)) {
+      const message = `Store ${name} does not exist in the database ${
+        this.#name
+      }.`;
+      throw new IndexedDBError(message);
+    }
+
+    this.#storeName = name;
+
+    return this;
+  }
+
+  async put<T>(value: T, key?: IDBValidKey | undefined): Promise<IDBValidKey> {
+    const { store } = this.#getConnection("readwrite");
     const request = store.put(value, key);
-    let savedKey: IDBValidKey | undefined;
 
     return new Promise((resolve, reject) => {
-      request.onsuccess = (e) => (savedKey = (e.target as IDBRequest).result);
-      transaction.oncomplete = () => resolve(savedKey);
-      transaction.onerror = () =>
+      request.onsuccess = (e) => resolve((e.target as IDBRequest).result);
+      request.onerror = () =>
         reject(new IndexedDBError(`Error putting key ${key}`));
     });
   }
 
-  async set(key: string, value: T): Promise<IDBValidKey | undefined> {
+  async set<T>(key: string, value: T): Promise<IDBValidKey> {
     return this.put(value, key);
   }
 
-  async get(query: IDBValidKey | IDBKeyRange): Promise<T> {
-    const db = this.#getDB();
-    const transaction = db.transaction(this.#storeName, "readonly");
-    const store = transaction.objectStore(this.#storeName);
+  async get<T>(query: IDBValidKey | IDBKeyRange): Promise<T> {
+    const { store } = this.#getConnection("readonly");
     const request = store.get(query);
-    let result: T;
 
     return new Promise((resolve, reject) => {
-      request.onsuccess = () => (result = request.result);
-      transaction.oncomplete = () => resolve(result);
-      transaction.onerror = () =>
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () =>
         reject(new IndexedDBError(`Error fetching key ${query}`));
     });
   }
 
-  async getMap(
+  async getMap<T>(
     limit = 1000,
     direction: IDBCursorDirection = "next",
   ): Promise<Map<string, T>> {
-    const db = this.#getDB();
-    const transaction = db.transaction(this.#storeName, "readonly");
-    const store = transaction.objectStore(this.#storeName);
+    const { store } = this.#getConnection("readonly");
     const cursor = store.openCursor(null, direction);
     const entries: Map<string, T> = new Map();
     let count = 0;
@@ -137,22 +170,20 @@ export class IndexedDB<T> {
   }
 
   async delete(key: string): Promise<void> {
-    const db = this.#getDB();
-    const transaction = db.transaction(this.#storeName, "readwrite");
-    const store = transaction.objectStore(this.#storeName);
-    store.delete(key);
+    const { store } = this.#getConnection("readwrite");
+    const request = store.delete(key);
 
     return new Promise((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () =>
+      request.onsuccess = () => resolve();
+      request.onerror = () =>
         reject(new IndexedDBError(`Error deleting key ${key}`));
     });
   }
 
   close(): void {
-    if (this.#dbConnection) {
-      this.#dbConnection.close();
-      this.#dbConnection = null;
+    if (this.#db) {
+      this.#db.close();
+      this.#db = null;
     }
   }
 }
