@@ -9,10 +9,11 @@ type StoreDefinition = {
   options?: IDBObjectStoreParameters;
 };
 
-export class IndexedDBError extends Error {
+export class IndexedDBServiceError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "IndexedDBError";
+    this.name = "IndexedDBServiceError";
+    Object.setPrototypeOf(this, new.target.prototype);
   }
 }
 
@@ -54,14 +55,14 @@ export class IndexedDBService {
 
       request.onerror = () => {
         const message = `Error opening database ${this.#name}`;
-        reject(new IndexedDBError(message));
+        reject(new IndexedDBServiceError(message));
       };
 
       request.onblocked = () => {
         const message = `Database ${
           this.#name
         } is blocked.Close other tabs or windows accessing this database.`;
-        reject(new IndexedDBError(message));
+        reject(new IndexedDBServiceError(message));
       };
     });
   }
@@ -71,7 +72,7 @@ export class IndexedDBService {
       const message = `Database ${
         this.#name
       } is not initialized.Please open the database before using it.`;
-      throw new IndexedDBError(message);
+      throw new IndexedDBServiceError(message);
     }
 
     return this.#db;
@@ -83,7 +84,7 @@ export class IndexedDBService {
   } {
     if (!this.#storeName) {
       const message = `Store is not set. Please use useStore() before using the store.`;
-      throw new IndexedDBError(message);
+      throw new IndexedDBServiceError(message);
     }
 
     const db = this.#getDatabase();
@@ -94,7 +95,7 @@ export class IndexedDBService {
       const message = `Transaction error in store '${
         this.#storeName
       }': ${transaction.error?.message}`;
-      throw new IndexedDBError(message);
+      throw new IndexedDBServiceError(message);
     };
 
     return { transaction, store };
@@ -107,7 +108,7 @@ export class IndexedDBService {
       const message = `Store ${name} does not exist in the database ${
         this.#name
       }.`;
-      throw new IndexedDBError(message);
+      throw new IndexedDBServiceError(message);
     }
 
     this.#storeName = name;
@@ -122,7 +123,7 @@ export class IndexedDBService {
     return new Promise((resolve, reject) => {
       request.onsuccess = (e) => resolve((e.target as IDBRequest).result);
       request.onerror = () =>
-        reject(new IndexedDBError(`Error putting key ${key}`));
+        reject(new IndexedDBServiceError(`Error putting key ${key}`));
     });
   }
 
@@ -137,7 +138,7 @@ export class IndexedDBService {
     return new Promise((resolve, reject) => {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () =>
-        reject(new IndexedDBError(`Error fetching key ${query}`));
+        reject(new IndexedDBServiceError(`Error fetching key ${query}`));
     });
   }
 
@@ -164,7 +165,7 @@ export class IndexedDBService {
       };
 
       cursor.onerror = () => {
-        reject(new IndexedDBError(`Error fetching all entries`));
+        reject(new IndexedDBServiceError(`Error fetching all entries`));
       };
     });
   }
@@ -176,7 +177,7 @@ export class IndexedDBService {
     return new Promise((resolve, reject) => {
       request.onsuccess = () => resolve();
       request.onerror = () =>
-        reject(new IndexedDBError(`Error deleting key ${key}`));
+        reject(new IndexedDBServiceError(`Error deleting key ${key}`));
     });
   }
 
