@@ -1,5 +1,5 @@
 export class FetchError extends Error {
-  constructor(resource: string, status: number, statusText: string) {
+  constructor(resource: string, status?: number, statusText?: string) {
     super(
       `Failed to fetch data from ${resource}${
         status ? `: ${status} ${statusText}` : ""
@@ -35,4 +35,20 @@ export const fetchBlob = async (
   } else {
     throw new FetchError(resource, response.status, response.statusText);
   }
+};
+
+export const blobToDataURL = (blob: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.readAsDataURL(blob);
+    reader.onerror = () => reject(reader.error);
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("Unexpected result type"));
+      }
+    };
+  });
 };
